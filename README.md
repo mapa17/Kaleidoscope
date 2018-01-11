@@ -1,2 +1,2 @@
 # Kaleidoscope
-An infinit number of worlds
+An infinite number of worlds
