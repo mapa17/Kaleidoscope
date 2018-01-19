@@ -20,7 +20,7 @@ screen = pygame.display.set_mode(size)
  
 pygame.display.set_caption("Example code for the draw module")
 array = pygame.surfarray.pixels3d(screen)
-#st()
+st()
 
 #Loop until the user clicks the close button.
 done = False
