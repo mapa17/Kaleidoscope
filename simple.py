@@ -90,8 +90,6 @@ def gol_agent2(ROI, dx, dy):
         
     return ROI
 
-
-
 def dummy_environment(world):
     pass
 
@@ -103,13 +101,18 @@ def random_genesis(world, threshold=0.5):
     world[decision >= threshold, ] =  BLACK
 
 class World():
-    def __init__(self, x, y, dx, dy, name, genesis=dummy_genesis, environment=dummy_environment, agent=dummy_agent):
-        self.surface = surface2(x, y, name)
+    def __init__(self, x, y, dx, dy, name, genesis=dummy_genesis, environment=dummy_environment, agent=dummy_agent, surface=surface2):
+        self.surface = surface(x, y, name)
         self.W0 = np.ones(shape=(x, y)) 
         self.genesis = genesis
         self.environment = environment
         self.agent = agent
         self.x, self.y, self.dx, self.dy = x, y, dx, dy
+
+        # Default internal states of the world
+        self.terminate = False
+        self.pause = False
+        self.cycle_sleep = 0.5
     
     def __enter__(self):
         self.genesis(self.W0)
@@ -118,34 +121,57 @@ class World():
 
     def __exit__(self, *args):
         self.surface.destroy()
-
-    def cycle(self):
-        return_value = True
-        self.environment(self.W0)
-
-        W1 = self.W0.copy()
-
-        # Run the agent function over the complete world
-        dx = self.dx
-        dy = self.dy
-        for x in range(dx,self.x):
-            for y in range(dy, self.y):
-                W1[x-dx:x+dx+1, y-dy:y+dy+1] = self.agent(self.W0[x-dx:x+dx+1, y-dy:y+dy+1], dx, dy)
-        self.surface.update(W1)
-
+    
+    def _input_handling(self):
         # Handle user input
         for event in pygame.event.get(): # User did something
             if event.type == pygame.QUIT: # If user clicked close
-                return_value=False # Flag that we are done so we exit this loop
-        
-        return return_value
+                self.terminate = True # Flag that we are done so we exit this loop
+            elif event.type == pygame.KEYDOWN :
+                if event.key == pygame.K_SPACE :
+                    if self.pause:
+                        self.pause = False
+                    else:
+                        self.pause = True
+                elif event.key == pygame.K_q:
+                    self.terminate = True
+                elif event.key == pygame.K_w:
+                    self.cycle_sleep = self.cycle_sleep * 0.8
+                elif event.key == pygame.K_s:
+                    self.cycle_sleep = self.cycle_sleep * 1.2
+                elif event.key == pygame.K_q:
+                    # TODO: save image
+                    pass
 
+
+    def cycle(self):
+        return_value = True
+
+        # Handle user input
+        self._input_handling()
+        
+        if not self.pause:
+            self.environment(self.W0)
+
+            W1 = self.W0.copy()
+
+            # Run the agent function over the complete world
+            dx = self.dx
+            dy = self.dy
+            for x in range(dx,self.x):
+                for y in range(dy, self.y):
+                    W1[x-dx:x+dx+1, y-dy:y+dy+1] = self.agent(self.W0[x-dx:x+dx+1, y-dy:y+dy+1], dx, dy)
+            self.surface.update(W1)
+
+        if self.terminate:
+            return_value = False
+
+        return return_value
 
 x = 50
 y = 50
 name = 'First try'
 
-#st()
 clock = pygame.time.Clock()
 #with World(x, y, dx, dy, name, agent=random_agent) as world:
 
@@ -155,10 +181,12 @@ opts = {'x':x, 'y':y, 'dx':1, 'dy':1, 'name': name, \
     }
 
 loop_cnt = 0
-with World(x, y, 1, 1, name, genesis=lambda x: random_genesis(x, threshold=0.95), agent=gol_agent2) as world:
-#with World(x, y, 1, 1, name, genesis=dummy_genesis, agent=dummy_agent) as world:
+with World(**opts) as world:
     while(world.cycle()):
         loop_cnt = loop_cnt + 1
         #time.sleep(1.0)
         clock.tick(10)
-        print('Cycle %d' % loop_cnt)
+        if world.pause:
+            print('<<Paused>>')
+        else:
+            print('Cycle %d' % loop_cnt)
