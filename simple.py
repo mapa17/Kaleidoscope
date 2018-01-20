@@ -149,6 +149,11 @@ name = 'First try'
 clock = pygame.time.Clock()
 #with World(x, y, dx, dy, name, agent=random_agent) as world:
 
+opts = {'x':x, 'y':y, 'dx':1, 'dy':1, 'name': name, \
+    'agent': gol_agent2, 'genesis': lambda x: random_genesis(x, threshold=0.95),
+    'surface': surface2
+    }
+
 loop_cnt = 0
 with World(x, y, 1, 1, name, genesis=lambda x: random_genesis(x, threshold=0.95), agent=gol_agent2) as world:
 #with World(x, y, 1, 1, name, genesis=dummy_genesis, agent=dummy_agent) as world:
