@@ -1,4 +1,3 @@
-import agent
 import numpy as np
 import pygame
 
@@ -23,6 +22,7 @@ class World():
         self.terminate = False
         self.pause = False
         self.cycle_sleep = 0.5
+        self.cycle_cnt = 0
     
     def __enter__(self):
         self.genesis(self.W0)
@@ -49,8 +49,10 @@ class World():
                     self.cycle_sleep = self.cycle_sleep * 0.8
                 elif event.key == pygame.K_s:
                     self.cycle_sleep = self.cycle_sleep * 1.2
-                elif event.key == pygame.K_q:
-                    # TODO: save image
+                elif event.key == pygame.K_t:
+                    img_path = "./screen_shots/world_%03d.png" % self.cycle_cnt
+                    print('Writing image to %s ...' % img_path)
+                    self.surface.store_image(self.W0, img_path)
                     pass
 
 
@@ -61,6 +63,7 @@ class World():
         self._input_handling()
         
         if not self.pause:
+            self.cycle_cnt = self.cycle_cnt + 1
             self.environment(self.W0)
 
             W1 = self.W0.copy()

@@ -17,7 +17,6 @@ opts = {'x':100, 'y':100, 'dx':1, 'dy':1, 'name': 'First_try', \
     }
 
 clock = pygame.time.Clock()
-loop_cnt = 0
 with world.World(**opts) as world:
     while(world.cycle()):
         #time.sleep(1.0)
@@ -25,5 +24,4 @@ with world.World(**opts) as world:
         if world.pause:
             print('<<Paused>>')
         else:
-            loop_cnt = loop_cnt + 1
-            print('Cycle %d' % loop_cnt)
+            print('Cycle %d' % world.cycle_cnt)
