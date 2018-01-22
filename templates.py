@@ -36,16 +36,16 @@ def gol_agent(ROI, dx, dy):
 
     if binary[dx, dy]:
         # Starvation
-        if pop < 2:
+        if pop < 3:
             nstate = WHITE
         # Overpopulation
-        elif pop > 3:
+        elif pop > 4:
             nstate = WHITE
         else:
             nstate = BLACK
     else:
         # Reproduction
-        if pop >= 3:
+        if pop == 3:
             nstate = BLACK
         else:
             nstate = WHITE

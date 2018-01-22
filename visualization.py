@@ -4,6 +4,7 @@ import scipy
 import numpy as np
 
 from world import WHITE, BLACK
+from pudb import set_trace as st
 
 
 class surface2():

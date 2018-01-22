@@ -13,14 +13,16 @@ import visualization
 opts = {'x':100, 'y':100, 'dx':1, 'dy':1, 'name': 'First_try', \
     'genesis': lambda x: templates.random_genesis(x, threshold=0.95),
     'agent': templates.gol_agent,
-    'surface': visualization.surface2
+    'surface': visualization.surface2,
+    'border_policy': 'wrap'
     }
 
 clock = pygame.time.Clock()
 with world.World(**opts) as world:
-    while(world.cycle()):
+    while(not world.terminate):
         #time.sleep(1.0)
-        clock.tick(10)
+        world.cycle()
+        time.sleep(world.cycle_sleep)
         if world.pause:
             print('<<Paused>>')
         else:
