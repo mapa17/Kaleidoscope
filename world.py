@@ -8,7 +8,12 @@ NOSE = 0.77
 import visualization as viz
 import templates as T
 
-from pudb import set_trace as st
+try:
+    from pudb import set_trace as st
+except ModuleNotFoundError:
+    st = lambda: None 
+
+
 
 class World():
     def __init__(self, x, y, dx, dy, name, \
@@ -17,6 +22,7 @@ class World():
     agent=T.dummy_agent, \
     surface=viz.surface2, \
     border_policy='deadzone'):
+        st()
         self.surface = surface(x, y, name)
         self.W0 = np.ones(shape=(x+2*dx, y+2*dy)) 
         self.genesis = genesis

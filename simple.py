@@ -1,7 +1,10 @@
 import pygame
 import time
 import numpy as np
-from pudb import set_trace as st
+try:
+    from pudb import set_trace as st
+except ModuleNotFoundError:
+    st = lambda: None 
 import scipy.misc
 import world
 from world import BLACK, WHITE

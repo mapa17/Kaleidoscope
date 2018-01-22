@@ -4,7 +4,10 @@ import scipy
 import numpy as np
 
 from world import WHITE, BLACK
-from pudb import set_trace as st
+try:
+    from pudb import set_trace as st
+except ModuleNotFoundError:
+    st = lambda: None 
 
 
 class surface2():
