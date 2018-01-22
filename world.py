@@ -33,8 +33,8 @@ class World():
 
         # Default internal states of the world
         self.terminate = False
-        self.pause = False
-        self.cycle_sleep = 0.5
+        self.pause = True # Start paused 
+        self.cycle_sleep = 0.25
         self.cycle_cnt = 0
     
     def __enter__(self):
@@ -67,7 +67,7 @@ class World():
                 elif event.key == pygame.K_w:
                     self.cycle_sleep = max(0.0, self.cycle_sleep - 0.25)
                 elif event.key == pygame.K_s:
-                    self.cycle_sleep = self.cycle_sleep + .25
+                    self.cycle_sleep = min(2.0, self.cycle_sleep + .25)
                 elif event.key == pygame.K_t:
                     img_path = "./screen_shots/world_%03d.png" % self.cycle_cnt
                     print('Writing image to %s ...' % img_path)
