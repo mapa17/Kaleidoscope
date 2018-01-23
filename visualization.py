@@ -19,7 +19,6 @@ class surface2():
         pygame.display.set_caption(name)
     
     def update(self, world):
-        #self.W0[:, :, :] = W1[:, :, :]
         img = self.__buffer_to_image(world, self.scale)
         buff = scipy.misc.fromimage(img)
 

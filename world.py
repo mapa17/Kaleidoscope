@@ -1,5 +1,15 @@
 import numpy as np
+import numpy
 import pygame
+import ctypes
+
+try:
+    from pudb import set_trace as st
+except ModuleNotFoundError:
+    st = lambda: None 
+
+import multiprocessing as mp
+from multiprocessing import Pool
 
 BLACK = 0.0
 WHITE = 1.0
@@ -8,21 +18,14 @@ NOSE = 0.77
 import visualization as viz
 import templates as T
 
-try:
-    from pudb import set_trace as st
-except ModuleNotFoundError:
-    st = lambda: None 
-
-
-
 class World():
     def __init__(self, x, y, dx, dy, name, \
     genesis=T.dummy_genesis, \
     environment=T.dummy_environment, \
     agent=T.dummy_agent, \
     surface=viz.surface2, \
-    border_policy='deadzone'):
-        st()
+    border_policy='deadzone', \
+    seed=None):
         self.surface = surface(x, y, name)
         self.W0 = np.ones(shape=(x+2*dx, y+2*dy)) 
         self.genesis = genesis
@@ -36,8 +39,24 @@ class World():
         self.pause = True # Start paused 
         self.cycle_sleep = 0.25
         self.cycle_cnt = 0
+
+        # Prepare worker process
+        self.shared_W0 = mp.Array(ctypes.c_double, (x+2*dx)*(y+2*dy), lock=False)
+        self.W0 = np.frombuffer(self.shared_W0)
+        self.W0 = self.W0.reshape(x+2*dx, y+2*dy)
+
+        self.shared_W1 = mp.Array(ctypes.c_double, self.W0.size, lock=False)
+        self.W1 = np.frombuffer(self.shared_W1)
+        self.W1 = self.W1.reshape(self.W0.shape)
+
+        ncpu = mp.cpu_count()
+        if seed is None:
+            seed = np.random.randint(10000) 
+        self.pool = Pool(processes=ncpu, initializer=self._init_worker, initargs=(seed, self.shared_W0, self.shared_W1,))
+
     
     def __enter__(self):
+        self.W0[:, :] = WHITE
         self.genesis(self.W0)
         # Apply the border policy selected
         self._border_policy_enforcement(self.W0)
@@ -50,6 +69,7 @@ class World():
 
     def __exit__(self, *args):
         self.surface.destroy()
+        self.pool.terminate()
     
     def _input_handling(self):
         # Handle user input
@@ -99,6 +119,30 @@ class World():
         else:
             print("Error! Invalid border policy!")
 
+    @staticmethod
+    def _init_worker(seed, shared_W0_, shared_W1_):
+        p = mp.current_process()
+        my_seed = seed + int(p.name.split('-')[1])
+        print('Initializing random generator in %s with %s' % (p.name, my_seed))
+        numpy.random.seed(my_seed)
+
+        global shared_W1
+        shared_W1 = shared_W1_
+        global shared_W0
+        shared_W0 = shared_W0_
+
+    @staticmethod
+    def _agend_process(ix, x, y, dx, dy, agent):
+        W0 = np.frombuffer(shared_W0)
+        W0 = W0.reshape(x+2*dx, y+2*dy)
+
+        W1 = np.frombuffer(shared_W1)
+        W1 = W1.reshape(x+2*dx, y+2*dy)
+
+        for iy in range(dy, y+dy):
+            W1[ix, iy] = agent(W0[ix-dx:ix+dx+1, iy-dy:iy+dy+1], dx, dy)
+
+
     def cycle(self):
         # Handle user input
         self._input_handling()
@@ -108,22 +152,20 @@ class World():
 
             # Apply environment function
             self.environment(self.W0)
-
-            W1 = self.W0.copy()
+            self.W1[:, :] = self.W0[:, :]
 
             # Run the agent function over the complete world
             dx = self.dx
             dy = self.dy
-            for x in range(dx,self.x+dx):
-                for y in range(dy, self.y+dy):
-                    #W1[x-dx:x+dx+1, y-dy:y+dy+1] = self.agent(self.W0[x-dx:x+dx+1, y-dy:y+dy+1], dx, dy)
-                    W1[x, y] = self.agent(self.W0[x-dx:x+dx+1, y-dy:y+dy+1], dx, dy)
+
+            args = [(x, self.x, self.y, dx, dy, self.agent) for x in range(dx, self.x+dx)]
+            self.pool.starmap(self._agend_process, args)
 
             # Apply the border policy selected
-            self._border_policy_enforcement(W1)
+            self._border_policy_enforcement(self.W1)
 
             # Pass the x, y area
-            self.surface.update(W1[dx:self.x+dx, dy:self.y+dy])
+            self.surface.update(self.W1[dx:self.x+dx, dy:self.y+dy])
 
             # Copy the world buffer for the next cycle
-            self.W0 = W1
+            self.W0[:, :] = self.W1[:, :]
