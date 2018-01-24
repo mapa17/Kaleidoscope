@@ -15,7 +15,8 @@ class surface2():
         pygame.init()
         self.scale = scale
         X, Y = int(self.scale * x), int(self.scale * y)
-        self.screen = pygame.display.set_mode([X, Y])
+        self.screen = pygame.display.set_mode((X, Y))
+        #self.screen = pygame.display.set_mode((X, Y), pygame.DOUBLEBUF | pygame.HWSURFACE | pygame.FULLSCREEN)
         pygame.display.set_caption(name)
     
     def update(self, world):
