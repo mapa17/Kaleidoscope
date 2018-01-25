@@ -2,6 +2,8 @@ import numpy as np
 import numpy
 import pygame
 import ctypes
+import time
+import datetime 
 
 try:
     from pudb import set_trace as st
@@ -39,6 +41,9 @@ class World():
         self.pause = True # Start paused 
         self.cycle_sleep = 0.25
         self.cycle_cnt = 0
+        self.last_cycle = datetime.datetime.now()
+        # Cycles per second
+        self.cps = 0
 
         # Prepare worker process
         self.shared_W0 = mp.Array(ctypes.c_double, (x+2*dx)*(y+2*dy), lock=False)
@@ -49,11 +54,15 @@ class World():
         self.W1 = np.frombuffer(self.shared_W1)
         self.W1 = self.W1.reshape(self.W0.shape)
 
+        # Reserve one for the plotting function
         ncpu = mp.cpu_count()
         if seed is None:
             seed = np.random.randint(10000) 
-        self.pool = Pool(processes=ncpu, initializer=self._init_worker, initargs=(seed, self.shared_W0, self.shared_W1,))
+        self.pool = Pool(processes=ncpu-1, initializer=self._init_worker, initargs=(seed, self.shared_W0, self.shared_W1,))
 
+        # Precalculate the worker arguments
+        self.worker_args = [(x, self.x, self.y, dx, dy, self.agent) for x in range(dx, self.x+dx)]
+ 
     
     def __enter__(self):
         self.W0[:, :] = WHITE
@@ -73,22 +82,23 @@ class World():
     
     def _input_handling(self):
         # Handle user input
-        for event in pygame.event.get(): # User did something
-            if event.type == pygame.QUIT: # If user clicked close
+        for etype, ekey in self.surface.get_events(): # User did something
+            #print('Getting event %d and key %s' % (etype, ekey))
+            if etype == pygame.QUIT: # If user clicked close
                 self.terminate = True # Flag that we are done so we exit this loop
-            elif event.type == pygame.KEYDOWN :
-                if event.key == pygame.K_SPACE :
+            elif etype == pygame.KEYDOWN :
+                if ekey == pygame.K_SPACE :
                     if self.pause:
                         self.pause = False
                     else:
                         self.pause = True
-                elif event.key == pygame.K_q:
+                elif ekey == pygame.K_q:
                     self.terminate = True
-                elif event.key == pygame.K_w:
+                elif ekey == pygame.K_w:
                     self.cycle_sleep = max(0.0, self.cycle_sleep - 0.25)
-                elif event.key == pygame.K_s:
+                elif ekey == pygame.K_s:
                     self.cycle_sleep = min(2.0, self.cycle_sleep + .25)
-                elif event.key == pygame.K_t:
+                elif ekey == pygame.K_t:
                     img_path = "./screen_shots/world_%03d.png" % self.cycle_cnt
                     print('Writing image to %s ...' % img_path)
                     self.surface.store_image(self.W0, img_path)
@@ -146,26 +156,28 @@ class World():
     def cycle(self):
         # Handle user input
         self._input_handling()
-        
         if not self.pause:
+            # Calculate cycles per second
+            now = datetime.datetime.now()
+            diff = now - self.last_cycle
+            insec = diff.seconds + diff.microseconds / 999999
+            self.cpc = float(1.0 / insec)
+            self.last_cycle = now
+
             self.cycle_cnt = self.cycle_cnt + 1
 
             # Apply environment function
             self.environment(self.W0)
             self.W1[:, :] = self.W0[:, :]
 
-            # Run the agent function over the complete world
-            dx = self.dx
-            dy = self.dy
-
-            args = [(x, self.x, self.y, dx, dy, self.agent) for x in range(dx, self.x+dx)]
-            self.pool.starmap(self._agend_process, args)
+            # Use the worker pool in order to update self.W1 based on self.W0
+            self.pool.starmap(self._agend_process, self.worker_args)
 
             # Apply the border policy selected
             self._border_policy_enforcement(self.W1)
 
             # Pass the x, y area
-            self.surface.update(self.W1[dx:self.x+dx, dy:self.y+dy])
+            self.surface.update(self.W1[self.dx:self.x+self.dx, self.dy:self.y+self.dy])
 
             # Copy the world buffer for the next cycle
             self.W0[:, :] = self.W1[:, :]

@@ -6,6 +6,8 @@ try:
 except ModuleNotFoundError:
     st = lambda: None 
 import scipy.misc
+import sys
+
 import world
 from world import BLACK, WHITE
 
@@ -32,4 +34,6 @@ with world.World(**opts) as world:
         if world.pause:
             print('<<Paused>>    ', end='\r')
         else:
-            print('Cycle %d    ' % world.cycle_cnt, end='\r')
+            print('Cycle %d: %02.2fcpc' % (world.cycle_cnt, world.cpc), end='\r')
+        
+        sys.stdout.flush()
