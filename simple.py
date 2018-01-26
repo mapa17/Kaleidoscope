@@ -18,6 +18,7 @@ import visualization
 opts = {'x':100, 'y':100, 'dx':1, 'dy':1, 'name': 'First_try', \
     'genesis': lambda x: templates.random_genesis(x, threshold=0.90),
     'agent': templates.gol_agent,
+    #'agent': templates.snowflake,
     'surface': visualization.surface2,
     'border_policy': 'wrap',
     'seed': 23

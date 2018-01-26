@@ -4,6 +4,7 @@ import pygame
 import ctypes
 import time
 import datetime 
+import os
 
 try:
     from pudb import set_trace as st
@@ -54,15 +55,22 @@ class World():
         self.W1 = np.frombuffer(self.shared_W1)
         self.W1 = self.W1.reshape(self.W0.shape)
 
+        # Start collector process
+        self.collector_queue = mp.Queue()
+        self.collector_feedback = mp.Queue()
+        self.collector = mp.Process(target=self._collector, args=(self.shared_W0, self.shared_W1, self.collector_queue, self.collector_feedback, (self.x+2*self.dx, self.y+2*self.dy)))
+        self.collector.start()
+ 
         # Reserve one for the plotting function
         ncpu = mp.cpu_count()
+        ncpu = 3
         if seed is None:
             seed = np.random.randint(10000) 
-        self.pool = Pool(processes=ncpu-1, initializer=self._init_worker, initargs=(seed, self.shared_W0, self.shared_W1,))
+        self.pool = Pool(processes=ncpu-2, initializer=self._init_worker, initargs=(seed, self.shared_W0, self.shared_W1, self.collector_queue))
 
         # Precalculate the worker arguments
         self.worker_args = [(x, self.x, self.y, dx, dy, self.agent) for x in range(dx, self.x+dx)]
- 
+
     
     def __enter__(self):
         self.W0[:, :] = WHITE
@@ -77,6 +85,7 @@ class World():
         return self
 
     def __exit__(self, *args):
+        self.collector.terminate()
         self.surface.destroy()
         self.pool.terminate()
     
@@ -130,7 +139,7 @@ class World():
             print("Error! Invalid border policy!")
 
     @staticmethod
-    def _init_worker(seed, shared_W0_, shared_W1_):
+    def _init_worker(seed, shared_W0_, shared_W1_, collector_queue_):
         p = mp.current_process()
         my_seed = seed + int(p.name.split('-')[1])
         print('Initializing random generator in %s with %s' % (p.name, my_seed))
@@ -141,6 +150,9 @@ class World():
         global shared_W0
         shared_W0 = shared_W0_
 
+        global collector_queue
+        collector_queue = collector_queue_
+
     @staticmethod
     def _agend_process(ix, x, y, dx, dy, agent):
         W0 = np.frombuffer(shared_W0)
@@ -149,8 +161,56 @@ class World():
         W1 = np.frombuffer(shared_W1)
         W1 = W1.reshape(x+2*dx, y+2*dy)
 
+        # Only call the agent function on alive cells
+        #for iy in np.where(W0[ix, :])[0]:
         for iy in range(dy, y+dy):
-            W1[ix, iy] = agent(W0[ix-dx:ix+dx+1, iy-dy:iy+dy+1], dx, dy)
+            #iy = min(iy+dy, y+dx)
+            roi = W0[ix-dx:ix+dx+1, iy-dy:iy+dy+1]
+            #print('Agend (%d, %d) %s' % (ix, iy, roi))
+            new_roi = agent(roi, dx, dy)
+            W1[ix, iy] = new_roi[dx, dy]
+            diff = np.where(roi != new_roi)[0]
+            if diff != []:
+                print(diff)
+                xoffset = ix-dx
+                yoffset = iy-dy
+                pid = os.getpid()
+                print(diff)
+                for (x, y) in diff[0]:
+                    collector_queue.put(((x + xoffset, y + yoffset), (pid, new_roi[x, y])))
+    
+    @staticmethod
+    def _collector(W0_, W1_, queue, feedback, size):
+        W0 = np.frombuffer(W0_)
+        W0 = W0.reshape(size)
+
+        W1 = np.frombuffer(W1_)
+        W1 = W1.reshape(size)
+
+        # Holds all changes
+        C = dict()
+        while(1):
+            msg = queue.get()
+            if msg == None:
+                # Apply changes and than return
+                for (x, y), (_, v) in C.items():
+                    W1[x, y] = v
+
+                # Empty our dict of changes
+                C = dict() 
+
+                # When done notify main process
+                feedback.put(None)
+            else:
+                # Unpack message and update C
+                (x, y), (pid, value) = msg 
+                if (x, y) in C:
+                    (p, _) = C[(x, y)]
+                    if pid > p:
+                       C[(x, y)] = (pid, value) 
+                else:
+                    C[(x, y)] = (pid, value) 
+
 
 
     def cycle(self):
@@ -172,6 +232,10 @@ class World():
 
             # Use the worker pool in order to update self.W1 based on self.W0
             self.pool.starmap(self._agend_process, self.worker_args)
+
+            # Make collector apply changes to W1 and wait until done
+            self.collector_queue.put(None)
+            _ = self.collector_feedback.get()
 
             # Apply the border policy selected
             self._border_policy_enforcement(self.W1)

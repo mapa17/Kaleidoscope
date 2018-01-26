@@ -27,7 +27,6 @@ def random_genesis(world, threshold=0.5):
 
 
 def gol_agent(ROI, dx, dy):
-    
     binary = (ROI == BLACK).astype(int) 
     pop = binary.sum()
 
@@ -49,5 +48,19 @@ def gol_agent(ROI, dx, dy):
             nstate = BLACK
         else:
             nstate = WHITE
-        
-    return nstate 
+
+    ROI[dx, dy] = nstate
+    return ROI
+
+def snowflake(ROI, dx, dy):
+    binary = (ROI == BLACK).astype(int) 
+    pop = binary.sum()
+
+    # If there is no neighbor, move the particle
+    if pop == 1:
+        ROI[np.random.randint(3, size=(1,2))] = BLACK
+        ROI[dx, dy] = WHITE
+    return ROI
+
+
+
