@@ -76,13 +76,12 @@ def gol_agent(ROI, dx, dy):
            [ 0.,  0.,  0.]])
 
     """
-    binary = (ROI == BLACK).astype(int) 
-    pop = binary.sum()
+    pop = ROI.sum()
 
     # Define next state
     nstate = ROI[dx, dy] 
 
-    if binary[dx, dy]:
+    if ROI[dx, dy]:
         # Starvation
         if pop < 3:
             nstate = WHITE
@@ -99,13 +98,11 @@ def gol_agent(ROI, dx, dy):
         #    nstate = WHITE
 
     ROI[dx, dy] = nstate
-    #return ROI[dx, dy]
 
 def snowflake(ROI, dx, dy):
-    binary = (ROI == BLACK).astype(int) 
-    pop = binary.sum()
+    pop = ROI.sum()
 
-    if binary[dx, dy]:
+    if ROI[dx, dy]:
         # If there is no neighbor, move the particle
         if pop < 2:
             ROI[dx, dy] = WHITE

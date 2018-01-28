@@ -14,8 +14,8 @@ except ModuleNotFoundError:
 import multiprocessing as mp
 from multiprocessing import Pool
 
-BLACK = 0.0
-WHITE = 1.0
+BLACK = 1
+WHITE = 0
 NOSE = 0.77
 
 from . import visualization as viz
@@ -30,7 +30,7 @@ class World():
     border_policy='deadzone', \
     seed=None):
         self.surface = surface(x, y, name)
-        self.W0 = np.ones(shape=(x+2*dx, y+2*dy)) 
+        self.W0 = np.zeros(shape=(x+2*dx, y+2*dy), dtype=np.byte) 
         self.genesis = genesis
         self.environment = environment
         self.agent = agent
@@ -81,7 +81,7 @@ class World():
         x, y = self.x, self.y
         dx, dy = self.dx, self.dy
         # Pass the x, y area
-        self.surface.update(self.W0[dx:x+dx, dy:y+dy])
+        self.surface.update(1 - self.W0[dx:x+dx, dy:y+dy])
         return self
 
     def __exit__(self, *args):
@@ -233,8 +233,8 @@ class World():
             # Apply the border policy selected
             self._border_policy_enforcement(self.W1)
 
-            # Display the newest buffer
-            self.surface.update(self.W1[self.dx:self.x+self.dx, self.dy:self.y+self.dy])
+            # Display the newest buffer (flip 1 for 0 and 0 for 1)
+            self.surface.update(1 - self.W1[self.dx:self.x+self.dx, self.dy:self.y+self.dy])
 
             # Copy the world buffer for the next cycle
             self.W0[:, :] = self.W1[:, :]
