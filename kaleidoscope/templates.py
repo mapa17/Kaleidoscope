@@ -76,12 +76,13 @@ def gol_agent(ROI, dx, dy):
            [ 0.,  0.,  0.]])
 
     """
-    pop = ROI.sum()
+    binary = (ROI == BLACK).astype(int)
+    pop = binary.sum()
 
     # Define next state
     nstate = ROI[dx, dy] 
 
-    if ROI[dx, dy]:
+    if binary[dx, dy]:
         # Starvation
         if pop < 3:
             nstate = WHITE
@@ -99,11 +100,43 @@ def gol_agent(ROI, dx, dy):
 
     ROI[dx, dy] = nstate
 
-def snowflake(ROI, dx, dy):
-    pop = ROI.sum()
 
-    if ROI[dx, dy]:
+def center_seed_genesis(world, x, y, seed_value=20):
+    #world[x/2, y/2] = seed_value
+    world[x/2, y/2] = 1
+
+def snowflake_spawn(world, x, y):
+    """
+    Spawn a new point on the border using a uniform distribution
+    """
+    side, position = np.random.randint(x+y, size=2)
+    side = side % 4
+    if side == 0:
+        xi = 0
+        yi = position % y
+    elif side == 1:
+        xi = x
+        yi = position % y
+    elif side == 2:
+        xi = position % x 
+        yi = 0
+    elif side == 3:
+        xi = position % x 
+        yi = y
+
+    world[xi, yi] = BLACK
+
+
+def snowflake(ROI, dx, dy, seed_value=20):
+    pop = (ROI == seed_value).astype(int).sum()
+
+    if ROI[dx, dy] == BLACK:
         # If there is no neighbor, move the particle
-        if pop < 2:
+        if pop < 1:
             ROI[dx, dy] = WHITE
-            ROI[np.random.randint(3, size=(1,2))] = BLACK
+            npos = np.random.randint(3, size=(1,2))[0]
+            ROI[npos[0], npos[1]] = BLACK 
+        else:
+            # If we are next to a seed_point, fix this one, making it a new seed
+            ROI[dx, dy] = seed_value
+

@@ -14,7 +14,7 @@ except ModuleNotFoundError:
 import multiprocessing as mp
 from multiprocessing import Pool
 
-BLACK = 1
+BLACK = 127
 WHITE = 0
 NOSE = 0.77
 
@@ -63,7 +63,6 @@ class World():
  
         # Reserve one for the plotting function
         ncpu = mp.cpu_count()
-        ncpu = 3
         if seed is None:
             seed = np.random.randint(10000) 
         self.pool = Pool(processes=ncpu-2, initializer=self._init_worker, initargs=(seed, self.shared_W0, self.shared_W1, self.collector_queue, (self.x+2*self.dx, self.y+2*self.dy)))
@@ -81,7 +80,7 @@ class World():
         x, y = self.x, self.y
         dx, dy = self.dx, self.dy
         # Pass the x, y area
-        self.surface.update(1 - self.W0[dx:x+dx, dy:y+dy])
+        self.surface.update(BLACK - self.W0[dx:x+dx, dy:y+dy])
         return self
 
     def __exit__(self, *args):
@@ -234,7 +233,7 @@ class World():
             self._border_policy_enforcement(self.W1)
 
             # Display the newest buffer (flip 1 for 0 and 0 for 1)
-            self.surface.update(1 - self.W1[self.dx:self.x+self.dx, self.dy:self.y+self.dy])
+            self.surface.update(BLACK - self.W1[self.dx:self.x+self.dx, self.dy:self.y+self.dy])
 
             # Copy the world buffer for the next cycle
             self.W0[:, :] = self.W1[:, :]
