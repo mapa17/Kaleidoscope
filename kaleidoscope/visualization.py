@@ -5,7 +5,7 @@ import numpy as np
 import multiprocessing as mp 
 import datetime
 
-from world import WHITE, BLACK
+from .world import WHITE, BLACK
 try:
     from pudb import set_trace as st
 except ModuleNotFoundError:

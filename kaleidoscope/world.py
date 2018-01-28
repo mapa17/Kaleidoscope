@@ -18,8 +18,8 @@ BLACK = 0.0
 WHITE = 1.0
 NOSE = 0.77
 
-import visualization as viz
-import templates as T
+from . import visualization as viz
+from . import templates as T
 
 class World():
     def __init__(self, x, y, dx, dy, name, \
@@ -66,7 +66,7 @@ class World():
         ncpu = 3
         if seed is None:
             seed = np.random.randint(10000) 
-        self.pool = Pool(processes=ncpu-2, initializer=self._init_worker, initargs=(seed, self.shared_W0, self.shared_W1, self.collector_queue))
+        self.pool = Pool(processes=ncpu-2, initializer=self._init_worker, initargs=(seed, self.shared_W0, self.shared_W1, self.collector_queue, (self.x+2*self.dx, self.y+2*self.dy)))
 
         # Precalculate the worker arguments
         self.worker_args = [(x, self.x, self.y, dx, dy, self.agent) for x in range(dx, self.x+dx)]
@@ -139,45 +139,38 @@ class World():
             print("Error! Invalid border policy!")
 
     @staticmethod
-    def _init_worker(seed, shared_W0_, shared_W1_, collector_queue_):
+    def _init_worker(seed, shared_W0_, shared_W1_, collector_queue_, size):
         p = mp.current_process()
         my_seed = seed + int(p.name.split('-')[1])
         print('Initializing random generator in %s with %s' % (p.name, my_seed))
         numpy.random.seed(my_seed)
 
-        global shared_W1
-        shared_W1 = shared_W1_
-        global shared_W0
-        shared_W0 = shared_W0_
+        global W0
+        W0 = np.frombuffer(shared_W0_)
+        W0 = W0.reshape(size)
+
+        global W1
+        W1 = np.frombuffer(shared_W1_)
+        W1 = W1.reshape(size)
 
         global collector_queue
         collector_queue = collector_queue_
 
     @staticmethod
     def _agend_process(ix, x, y, dx, dy, agent):
-        W0 = np.frombuffer(shared_W0)
-        W0 = W0.reshape(x+2*dx, y+2*dy)
+        pid = os.getpid()
 
-        W1 = np.frombuffer(shared_W1)
-        W1 = W1.reshape(x+2*dx, y+2*dy)
-
-        # Only call the agent function on alive cells
-        #for iy in np.where(W0[ix, :])[0]:
         for iy in range(dy, y+dy):
-            #iy = min(iy+dy, y+dx)
-            roi = W0[ix-dx:ix+dx+1, iy-dy:iy+dy+1]
-            #print('Agend (%d, %d) %s' % (ix, iy, roi))
-            new_roi = agent(roi, dx, dy)
+            roi = W0[ix-dx:ix+dx+1, iy-dy:iy+dy+1].copy()
+            new_roi = roi.copy()
+            agent(new_roi, dx, dy)
             W1[ix, iy] = new_roi[dx, dy]
-            diff = np.where(roi != new_roi)[0]
-            if diff != []:
-                print(diff)
+            diff = np.where(roi != new_roi)
+            if len(diff[0]) > 0:
                 xoffset = ix-dx
                 yoffset = iy-dy
-                pid = os.getpid()
-                print(diff)
-                for (x, y) in diff[0]:
-                    collector_queue.put(((x + xoffset, y + yoffset), (pid, new_roi[x, y])))
+                for (x, y) in zip(diff[0], diff[1]):
+                    collector_queue.put_nowait(((x + xoffset, y + yoffset), (pid, new_roi[x, y])))
     
     @staticmethod
     def _collector(W0_, W1_, queue, feedback, size):
@@ -240,7 +233,7 @@ class World():
             # Apply the border policy selected
             self._border_policy_enforcement(self.W1)
 
-            # Pass the x, y area
+            # Display the newest buffer
             self.surface.update(self.W1[self.dx:self.x+self.dx, self.dy:self.y+self.dy])
 
             # Copy the world buffer for the next cycle
