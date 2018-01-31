@@ -76,6 +76,7 @@ class World():
         self.genesis(self.W0)
         # Apply the border policy selected
         self._border_policy_enforcement(self.W0)
+        self.W1[:, :] = self.W0[:, :]
 
         x, y = self.x, self.y
         dx, dy = self.dx, self.dy
@@ -109,7 +110,7 @@ class World():
                 elif ekey == pygame.K_t:
                     img_path = "./screen_shots/world_%03d.png" % self.cycle_cnt
                     print('Writing image to %s ...' % img_path)
-                    self.surface.store_image(self.W0, img_path)
+                    self.surface.store_image(BLACK - self.W0.T, img_path)
 
     def _border_policy_enforcement(self, buffer):
         dx, dy = self.dx, self.dy
@@ -131,11 +132,14 @@ class World():
                 buffer[iy+y+dy, :] = buffer_original[(y+dy)-(iy+1), :]
         elif self.border_policy == 'wrap':
             buffer[0:dx, :] = buffer_original[x:x+dx, :]
-            buffer[x+dx:x+2*dx, :] = buffer_original[dx:2*dx, :]
+            #buffer[x+dx:x+2*dx, :] = buffer_original[dx:2*dx, :]
+            buffer[x:x+dx, :] = buffer_original[0:dx, :]
+            #buffer[x:x+dx, :] = BLACK
             buffer[:, 0:dy] = buffer_original[:, y:y+dy]
             buffer[:, y+dy:y+2*dy] = buffer_original[:, dy:2*dy]
         else:
             print("Error! Invalid border policy!")
+
 
     @staticmethod
     def _init_worker(seed, shared_W0_, shared_W1_, collector_queue_, size):
@@ -157,19 +161,35 @@ class World():
 
     @staticmethod
     def _agend_process(ix, x, y, dx, dy, agent):
+        """
+        Apply the given agent function to the row (ix) passing a copy of the world of size (dx x dy) to it
+        """
         pid = os.getpid()
-
+        qput = 0
+        # For given column (ix), process the columns from top to bottom (iy)
         for iy in range(dy, y+dy):
             roi = W0[ix-dx:ix+dx+1, iy-dy:iy+dy+1].copy()
             new_roi = roi.copy()
-            agent(new_roi, dx, dy)
-            W1[ix, iy] = new_roi[dx, dy]
-            diff = np.where(roi != new_roi)
+            new_roi[:] = -1
+
+            # Call user function
+            agent(roi, new_roi, dx, dy)
+
+            # Update locally if possible
+            if new_roi[dx, dy] > 0: 
+                W1[ix, iy] = new_roi[dx, dy]
+                new_roi[dx, dy] = -1
+
+            diff = np.where(new_roi >= 0)
             if len(diff[0]) > 0:
+                qput = qput+1
                 xoffset = ix-dx
                 yoffset = iy-dy
                 for (x, y) in zip(diff[0], diff[1]):
                     collector_queue.put_nowait(((x + xoffset, y + yoffset), (pid, new_roi[x, y])))
+
+        print('Process %d on column %d put %d elements into queue' % (pid, ix, qput))
+        
     
     @staticmethod
     def _collector(W0_, W1_, queue, feedback, size):
@@ -185,6 +205,7 @@ class World():
             msg = queue.get()
             if msg == None:
                 # Apply changes and than return
+                print('Apply dict\n%s' % C)
                 for (x, y), (_, v) in C.items():
                     W1[x, y] = v
 
@@ -196,6 +217,7 @@ class World():
             else:
                 # Unpack message and update C
                 (x, y), (pid, value) = msg 
+                print('Queue: (%d/%d) (%d, %d)' % (x,  y, pid, value))
                 if (x, y) in C:
                     (p, _) = C[(x, y)]
                     if pid > p:
@@ -220,7 +242,6 @@ class World():
 
             # Apply environment function
             self.environment(self.W0)
-            self.W1[:, :] = self.W0[:, :]
 
             # Use the worker pool in order to update self.W1 based on self.W0
             self.pool.starmap(self._agend_process, self.worker_args)

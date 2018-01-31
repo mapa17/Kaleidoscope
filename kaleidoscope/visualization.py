@@ -79,7 +79,7 @@ class surface2():
 
     @staticmethod    
     def __buffer_to_image(buffer, scale):
-        im = scipy.misc.toimage(buffer, cmin=0, cmax=127, mode='P')
+        im = scipy.misc.toimage(buffer, mode='P')
         size = tuple((np.array(im.size)*scale).astype(int))
         scaled_img = im.resize(size, resample=0)
         return scaled_img 

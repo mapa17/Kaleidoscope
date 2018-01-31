@@ -5,7 +5,7 @@ def dummy_agent(ROI, dx, dy):
     return ROI[dx, dy]
 def dummy_environment(world):
     pass
-def dummy_genesis(worl):
+def dummy_genesis(world):
     pass
 
 from .world import BLACK, WHITE
@@ -100,38 +100,53 @@ def gol_agent(ROI, dx, dy):
 
     ROI[dx, dy] = nstate
 
+def arrow_up(ROI, next_ROI, dx, dy):
+    if ROI[dx, dy] == BLACK:
+        next_ROI[dx, dy] = WHITE
+        next_ROI[dx, dy-1] = BLACK
 
-def center_seed_genesis(world, x, y, seed_value=20):
+
+def arrow_left(ROI, dx, dy):
+    if ROI[dx, dy] == BLACK:
+        ROI[dx, dy] = WHITE
+        ROI[dx-1, dy] = BLACK
+
+
+def block(world, x, y, xsize, ysize, filling):
+    world[x:x+xsize, y:y+ysize] = filling
+
+def center_seed_genesis(world, x, y, seed_value=100):
     #world[x/2, y/2] = seed_value
-    world[x/2, y/2] = 1
+    world[int(x/2), int(y/2)] = seed_value 
 
-def snowflake_spawn(world, x, y):
+def snowflake_spawn(world, x, y, dx, dy):
     """
     Spawn a new point on the border using a uniform distribution
     """
     side, position = np.random.randint(x+y, size=2)
     side = side % 4
     if side == 0:
-        xi = 0
-        yi = position % y
+        xi = 0+dx+1
+        yi = (position % y) + dy
     elif side == 1:
-        xi = x
-        yi = position % y
+        xi = x+dx-1
+        yi = (position % y) + dy
     elif side == 2:
-        xi = position % x 
-        yi = 0
+        xi = (position % x) + dx
+        yi = 0+dy+1
     elif side == 3:
-        xi = position % x 
-        yi = y
+        xi = (position % x) + dx
+        yi = y+dy-1
 
+    print('Spawning (%d/%d)'  % (xi, yi))
     world[xi, yi] = BLACK
 
 
-def snowflake(ROI, dx, dy, seed_value=20):
+def snowflake(ROI, dx, dy, seed_value=100):
     pop = (ROI == seed_value).astype(int).sum()
 
     if ROI[dx, dy] == BLACK:
-        # If there is no neighbor, move the particle
+        # If there is no seed neighbor, move the particle
         if pop < 1:
             ROI[dx, dy] = WHITE
             npos = np.random.randint(3, size=(1,2))[0]
